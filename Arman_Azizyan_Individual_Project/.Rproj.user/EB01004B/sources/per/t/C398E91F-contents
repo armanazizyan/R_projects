@@ -1,0 +1,163 @@
+---
+title: "Airbnb New York"
+author: "Arman Azizyan"
+date: "11/25/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggmap)
+library(ggpubr)
+```
+
+
+```{r}
+data <- read.csv("AB_NYC_2019.csv")
+
+#str(data)
+head(data)
+min(data$latitude)
+max(data$latitude)
+min(data$longitude)
+max(data$longitude)
+mylocation <- c(-74.21, 40.59, -73.65, 40.9)
+
+newdata <- data[sample(nrow(data), 1000),]
+
+nymap <- get_map(location = mylocation, source = "osm", zoom = 12, crop = F)
+
+
+ggmap(nymap, base_layer = ggplot(data=newdata, mapping = aes(x=longitude, y=latitude)))+
+  stat_density2d(aes(fill= ..density.. ), geom = "tile", contour = F, alpha= 0.35)+
+  scale_fill_distiller(palette = 'Oranges', direction = 1, guide = "none")
+
+
+
+```
+
+
+```{r}
+mylocation3 <- c(-74.05, 40.679, -73.9, 40.78)
+nymap3 <- get_map(location = mylocation3, source = "osm", zoom = 12, crop = F)
+ggmap(nymap3, base_layer = ggplot(data=newdata, mapping = aes(x=longitude, y=latitude)))+
+  stat_density2d(aes(fill= ..density.., alpha = ..density.. ), geom = "tile", contour = F)+
+  scale_fill_distiller(palette = 'Reds', direction = 1, guide = "none")+
+  scale_alpha(range = c(0,0.6))+
+  theme(legend.position = "none")
+
+```
+
+```{r}
+df <- newdata %>% filter(latitude<=40.78 & latitude>=40.675,
+                         longitude<= -73.9 & longitude>-74.05)
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", alpha = .1, color = NA)+
+  scale_fill_gradient2("Aribnb Listings", 
+                       low = "white", 
+                       mid = "yellow", 
+                       high = "red")+
+  ggtitle("Listing Density")
+
+```
+
+```{r}
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_summary_2d(mapping = aes(z=price), bins = 30, geom="tile", drop = T, fun = "mean", alpha = 0.5)+
+  scale_fill_gradient2("Average Price", 
+                       low = "white", 
+                       mid = "yellow", 
+                       high = "red")+
+  ggtitle("Average Price")
+
+```
+
+```{r}
+df <- newdata %>% filter(latitude<=40.78 & latitude>=40.675,
+                         longitude<= -73.9 & longitude>-74.05)
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", alpha = .2, color = NA)+
+  scale_fill_gradient2("Aribnb Listings", 
+                       low = "yellow", 
+                       mid = "yellow", 
+                       high = "red")+
+  stat_summary_2d(data=df%>%filter(price>=quantile(price,0.90)),
+                  mapping = aes(z=price/20), bins = 50, geom="tile", drop = T, fun = "mean", alpha = 0.2, color="orangered")+
+  ggtitle("Top 10% Most Expensive Listing Locations")
+```
+
+
+```{r}
+ggplot(data[data$price<=2000,], mapping = aes(x=price))+
+  geom_histogram(bins = 100, fill ="azure4", color = "black")+
+  theme_bw()+
+  labs(title = "Price Distrsibution", x="Price", y="Number of Listings")
+```
+
+```{r}
+ggplot()+
+  stat_count(data=data, mapping = aes(x=neighbourhood_group, fill=room_type), color="black")+
+  theme_bw()+
+  labs(title = "Neighborhoods and Room Types",
+       x= "Neighborhood",
+       y= "Number of listings",
+       fill = "Room Types")
+```
+
+```{r}
+ggplot()+
+  stat_count(data=data, mapping = aes(x=neighbourhood_group, fill=room_type), position = "fill",
+             color="black")+
+  theme_bw()+
+  labs(title = "Neighborhoods and Room Types",
+       x= "Neighborhood",
+       y= "Portion of Listings",
+       fill = "Room Types")
+```
+
+```{r}
+data %>% filter(price<=quantile(price,0.85)) %>% group_by(neighbourhood_group) %>% summarise(mean=mean(price), sd = sd(price)) %>%
+  ggplot(mapping = aes(x=neighbourhood_group, y= mean))+
+  geom_bar(stat="identity", fill = "azure4", color = "black", size = 1)+
+  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+
+  theme_bw()
+```
+
+```{r}
+a <- data %>% filter(price<=quantile(price,0.85)) %>% group_by(room_type) %>% 
+  summarise(mean=mean(price), sd = sd(price)) %>%
+  ggplot(mapping = aes(x=room_type, y= mean))+
+  geom_bar(stat="identity", fill = "azure4", color = "black", size = 1)+
+  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())+
+  labs(title = "Bottom 85%", x="Room Type", y="Mean Price")
+
+b <- data %>% filter(price>=quantile(price,0.85)) %>% group_by(room_type) %>% 
+  summarise(mean=mean(price), sd = sd(price)) %>%
+  ggplot(mapping = aes(x=room_type, y= mean))+
+  geom_bar(stat="identity", fill = "azure4", color = "black", size = 1)+
+  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())+
+  labs(title = "Top 15%", x="", y="Mean Price")+
+  theme(axis.text.x = element_blank())
+
+c <- data %>% filter(price<=quantile(price,0.85)) %>% group_by(room_type) %>% 
+  count() %>%
+  ggplot(mapping = aes(x=room_type, y= n))+
+  geom_bar(stat="identity", fill = "azure4", color = "black", size = 1)+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())+
+  labs(title = "Bottom 85%", x="Room Type", y="Mean Price")
+  
+ggarrange(b, a,
+          ncol = 1, nrow = 2, align = "v")
+```
+

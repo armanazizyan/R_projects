@@ -1,0 +1,11 @@
+"0","dataout %>% group_by(neighbourhood_group) %>% summarise(mean=mean(price), sd = sd(price)) %>%"
+"0","  ggplot(mapping = aes(x=neighbourhood_group, y= mean))+"
+"0","  geom_bar(stat=""identity"", fill = ""azure2"", color = ""black"", size = 1)+"
+"0","  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+"
+"0","  theme_bw()+"
+"0","  geom_violin(data=dataout, aes(x=neighbourhood_group, y = price), fill = NA)+"
+"0","  labs(title=""Mean Price and Price Distribution by Neighborhood (bars show mean)"")+xlab("""")+ylab(""Price"")+theme(panel.border = element_blank(),"
+"0","                   panel.grid.minor = element_blank(),"
+"0","                   panel.grid.major.x = element_blank())"
+"2","`summarise()` ungrouping output (override with `.groups` argument)
+"

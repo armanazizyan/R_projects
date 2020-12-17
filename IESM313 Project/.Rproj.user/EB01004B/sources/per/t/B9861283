@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1588933486916.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "736216441",
+    "id" : "B9861283",
+    "lastKnownWriteTime" : 1588933972,
+    "last_content_update" : 1588933972397,
+    "path" : "C:/Users/Tamara/Desktop/DM Project QGIS/IESM313 Project/IESM-313-Project.Rmd",
+    "project_path" : "IESM-313-Project.Rmd",
+    "properties" : {
+        "cursorPosition" : "639,34",
+        "last_setup_crc32" : "157507CE1f5b5419",
+        "scrollLine" : "634"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

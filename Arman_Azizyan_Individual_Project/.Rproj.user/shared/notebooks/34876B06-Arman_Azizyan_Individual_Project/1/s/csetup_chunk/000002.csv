@@ -1,0 +1,29 @@
+"0","knitr::opts_chunk$set(echo = TRUE)"
+"0","library(dplyr)"
+"2","
+Attaching package: ‘dplyr’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+"
+"2","The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+"
+"0","library(tidyr)"
+"0","library(ggplot2)"
+"0","library(ggmap)"
+"2","package ‘ggmap’ was built under R version 4.0.3"
+"2","Google's Terms of Service: https://cloud.google.com/maps-platform/terms/.
+"
+"2","Please cite ggmap if you use it! See citation(""ggmap"") for details.
+"
+"0","library(ggpubr)"
+"2","Registered S3 method overwritten by 'data.table':
+  method           from
+  print.data.table     
+"

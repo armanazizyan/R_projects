@@ -1,0 +1,119 @@
+---
+title: "Video Game Sales"
+author: "Arman Azizyan"
+date: "11/25/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+# Introduction
+
+Since the development of first game consoles in 1970s and 1980s which were capable to play pingpong the industry has come a long way.
+
+```{r cars}
+data <- read.csv("vgsales.csv")
+str(data)
+data$Year <- as.numeric(data$Year)
+data$Year
+drop_na(data)
+
+```
+
+```{r}
+data %>% group_by(Year) %>% summarise(Total=sum(Global_Sales),
+                                      TotalNA = sum(NA_Sales),
+                                      TotalEU = sum(EU_Sales),
+                                      TotalJP = sum(JP_Sales),
+                                      TotalOther=sum(Other_Sales))%>%
+  filter(Year<=2016)%>%
+  ggplot()+geom_line(mapping = aes(x=Year, y=Total))+
+  geom_line(mapping = aes(x=Year, y=TotalNA), color = "red")+
+  geom_line(mapping = aes(x=Year, y=TotalEU), color = "blue")+
+  geom_line(mapping = aes(x=Year, y=TotalJP), color = "green")+
+  geom_line(mapping = aes(x=Year, y=TotalOther), color = "grey")+
+  geom_vline(xintercept = 2000, color = 'darkred', linetype = 'dotted')+
+  geom_vline(xintercept = 2003, color = 'darkred', linetype = 'dotted')+
+  geom_vline(xintercept = 2006, color = 'darkred', linetype = 'dotted')+
+  geom_vline(xintercept = 2008, color = 'darkred', linetype = 'dotted')+
+  geom_vline(xintercept = 2013, color = 'darkred', linetype = 'dotted')+
+  geom_vline(xintercept = 1996, color = 'darkred', linetype = 'dotted')+
+  annotate("text", x=1995.5, y=550, label = "1*", color = 'darkred')+
+  annotate("text", x=1999.5, y=550, label = "2*", color = 'darkred')+
+  annotate("text", x=2002.5, y=550, label = "3*", color = 'darkred')+
+  annotate("text", x=2005.5, y=550, label = "4*", color = 'darkred')+
+  annotate("text", x=2007.5, y=550, label = "5*", color = 'darkred')+
+  annotate("text", x=2012.5, y=550, label = "6*", color = 'darkred')+
+  scale_x_continuous(breaks = seq(1980, 2015, 2))+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank())+
+  labs(title = "Game Sales by Region",
+       y="Sales")
+  
+
+
+```
+
+1 nintendo 64
+2 ps2 xbox
+3 steam
+4 ps3 xbox 360
+5 mobile games
+6 ps4 xbox one
+```{r}
+data %>% group_by(Platform) %>% summarise(Total=sum(Global_Sales)) %>%
+  arrange(desc(Total)) %>% head(n=10) %>%
+  ggplot()+geom_bar(mapping = aes(x=reorder(Platform, -Total), y=Total), stat = "identity", fill = "azure4")+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank())+
+  labs(title = "Top 10 Platforms by Global Sales", x="Platform", y="Total Sales")
+```
+
+```{r}
+data %>% group_by(Platform) %>% count() %>%
+  arrange(desc(n)) %>% head(n=10) %>%
+  ggplot()+geom_bar(mapping = aes(x=reorder(Platform, -n), y=n), stat = "identity", fill = "azure4")+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank())+
+  labs(title = "Top 10 Platforms By number of Releases", x="Platform", y="Number of releases")
+```
+
+```{r}
+data %>% arrange(desc(Global_Sales)) %>% head(10)%>%
+  ggplot()+geom_bar(aes(x=reorder(Name, -Global_Sales), y=Global_Sales), stat="identity",
+                    fill="azure4")+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title = "Top 10 Games by Global Sales", x="", y="Global Sales")
+```
+
+
+```{r}
+data%>%group_by(Year) %>% count() %>% arrange(desc(n)) %>% head(10) %>%
+  ggplot(mapping = aes(x=reorder(Year,-n), y=n))+geom_bar(stat = "identity", fill="azure4")+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank())+
+  labs(title = "Top 10 Years with Most Releases", x="Year", y="Number of releases")
+```
+

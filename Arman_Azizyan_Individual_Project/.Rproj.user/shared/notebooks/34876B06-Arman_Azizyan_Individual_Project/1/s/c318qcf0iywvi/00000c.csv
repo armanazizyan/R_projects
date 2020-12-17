@@ -1,0 +1,4 @@
+"0","data <- read.csv(""AB_NYC_2019.csv"")"
+"0",""
+"0","#str(data)"
+"0","head(data, 5)"

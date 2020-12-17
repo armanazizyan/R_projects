@@ -1,0 +1,472 @@
+---
+title: "Tourism in Yerevan"
+author: "David Martirosyan, Tatevik Jalatyan, Mariam Hayrapetyan, Arman Azizyan, Gevorg Atanesyan"
+output:
+  pdf_document:
+    toc: true
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error=T, warning=F, message=F, echo=F)
+```
+
+\newpage
+
+## Overview
+
+Tourism is one of the largest segments of the Armenian economy (14.1% of GDP in 2018) (Harutyunyan, 2020). There are many reasons to visit Armenia such as historical monuments, churches, theaters, museums, skiing resorts, etc.
+This makes it important to change and evolve the segment through informed decisions and decrees both in public and private segments.
+With the help of data scraping, data visualization, and machine learning clustering methods we will be able to understand the key parameters which have an influence on Yerevan’s tourism industry. 
+
+
+## Research methodology
+
+Part of the data collection process was done by coding a scraper for TripAdvisor using Python. Methods used in the scraping process include Selenium, BeautifulSoup, Requests, etc. The rest of the data was taken from open sources found on the internet. The main tool used for data analysis was R as we believe the latter is superior for data visualization purposes. Google’s geocoding API was also used to retrieve longitude and latitude data for hotels (restaurants longitude and latitude were scraped). Also in the clustering part K Nearest Neighbors(KNN) lazy learning algorithm was used to classify data sets based on their similarity with neighbors. Again R was the main tool used.
+
+
+## Literaure review
+
+When reviewing articles we need to recognize what our understanding of the stated problem is, and the scope of the project. During such projects, our main aim is to learn, practice, and train our skills and knowledge. Since there is no previous requirement of knowledge about Spatial Analytic techniques we will start from the very beginning. We will learn how we can use our knowledge of data science and visualization with geospatial data for beneficial results.
+A number of researches have been done previously on this topic. Most have focused on the development of tourism and the main attraction places worth visiting  in Armenia/Yerevan. In the article “Tourism Development Trends in Armenia” it is stated that tourism was the main sector of economy in Armenia. The total contribution of  Travel & Tourism to GDP was USD 1.5 bn, 14.0 % of GDP in 2016 (Harutyunyan, 2020). It is also shown in the article that tourism highly developed from 2009 to 2017. In the article “CURRENT EXPERIENCE AND ACTUAL ISSUES OF DEVELOPMENT OF TOURISM IN THE REPUBLIC OF ARMENIA ” Saakyan I. mentions that three strong factors of the tourism sector in Armenia can be noted - history, nature and ecology and, although Armenia has all prerequisites for the development of tourism, there are still some problems that must be solved (Saakyan, 2020). The article “Perspectives of urban tourism in Yerevan” by Gayane Tovmasyan focuses on the main places worth visiting in Yerevan. There are many museums, parks, churches, monuments that attract tourists.  
+The article by Verka Jovanovic is an introduction to the GIS world for tourism analysis which is a perfect fit for our project. The article explains the process of the creation and acquisition of spatial data and the application of GIS-based software and methods. 
+The article provides insight into how the tabular data of tourism infrastructure can be analyzed using maps and briefly describes the types of studies that could be done using GIS such as proximity analysis, network analysis, geographic relationships, etc.
+The GIS-based approach allows us to conduct studies by combining touristic objects (hotels, restaurants, bars, etc.), categories of hotels where they can be standardized with specific criteria. The use of the analysis with the data can bring improvements based on demographic and characteristic research which will be useful for capital investment in the tourism industry.
+
+## Data
+
+Part of the data was scraped from TripAdvisor (to get data on hotels, restaurants, etc). 
+We also used OpenStreetMap servers to visualize the map and gather transport, health, and other infrastructure data that is not available on specific websites for scraping.
+The data includes features such as name, rating, location, longitude and latitude, etc.
+
+
+## Hypotheses
+
+In order to provide decision-makers with information and give them better insights, we need to use the available data to create informative visualizations as well as do some analysis that will help understand the background of the resulting visualization. 
+Using data that will be acquired through publicly available sources and via data scraping, we will describe the current state of densities and centers that are present in Yerevan. Visualizations will provide information not only on the densities of points of interest but will also give insight on ratings, which will hopefully provide some feedback to decision-makers. Initially, we believe that the main attractions in Yerevan will be clustered in the Center area, with prices being relatively higher for hotels, restaurants and other attractions.
+We also want to examine the dynamics of those local areas of dense tourism and attraction development using clustering techniques. Our aim will be to analyze these clusters to see what is the reason for their existence and development and what decisions affect them. This will help to stabilize, move, increase, or decrease the speed and volume of the development of selected objects, (cafes, hotels, etc.) in order to optimize the dynamics of the city.
+
+
+## Analysis
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(ggmap)
+library(cowplot)
+library(reshape2)
+library(ggcorrplot)
+library(viridis)
+library(class)
+library(stats)
+```
+
+```{r}
+hotels <- read_csv("TripAdvisorHotelClean.csv")
+hotels <- hotels %>% arrange(desc(`Stars out of 5`)) %>% filter(`Stars out of 5` > 0 & lat != max(lat) & lng != max(lng))
+restaurants <- read_csv("TripAdvisorRestaurantClean.csv")
+```
+
+```{r}
+
+df <- hotels
+df <- na.omit(df)  
+df <- df %>% filter(lng<=44.53 & lng >=44.495, lat<=40.19 & lat>=40.17)
+longlat <- cbind(df$lng, df$lat)
+clusters <- kmeans(longlat, centers = 5)
+```
+
+
+
+```{r}
+yerevan <- c(min(hotels$lng), min(hotels$lat), max(hotels$lng), max(hotels$lat))
+yvn <- get_map(location = yerevan, source="osm", zoom = 13)
+
+yerevan_center <- c(44.49, 40.16, 44.535, 40.195)
+yvn_center <- get_map(location = yerevan_center, source="osm")
+```
+
+
+```{r, fig.height=8, fig.width=12, fig.cap='Hotels Grouped by Stars in Yerevan'}
+
+map_zoomedOut <- ggmap(yvn) + 
+  geom_point(data = hotels, aes(x = lng, y = lat, color = as.factor(`Stars out of 5`)), size = 3, alpha = 0.6) + 
+  scale_colour_brewer(palette = 'Set1') + 
+  ylab('') + xlab('') + 
+  labs(color = "Stars") + 
+  theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+map_zoomedOut
+```
+
+\ 
+
+Above (Figure 2)  we can see a zoomed out perspective of Yerevan, with hotels plotted in different color groups. Although a more detailed discussion will be provided for the zoomed in variant of Yerevan (in Figure 3), a few important trends can be identified. Firstly, as we can see there are mostly three star hotels in Yerevan. The latter are densely populated in the center of the city, with four star hotels being further apart and further away from the center, and two star hotels even further away. There are only a handful of five star hotels that are found in rather random places, with only a few being in the city center. Hence, by observing Figure 2, we can conclude that hotels are generally located close to the center of Yerevan, with three star hotels being the most common.
+
+\newpage
+
+```{r, fig.height=8, fig.width=12, fig.cap='Hotels Grouped by Stars in Yerevan (Center)'}
+
+map_zoomedIn <- ggmap(yvn_center) + 
+  geom_point(data = hotels, aes(x = lng, y = lat, color = as.factor(`Stars out of 5`)), size = 3.25, alpha = 0.8) + 
+  scale_colour_brewer(palette = "Set1") + 
+  ylab('') + xlab('') + 
+  labs(color = "Stars") + 
+  theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+map_zoomedIn
+```
+
+\   
+
+Here we see the zoomed in version of Figure 2 which shows the distribution of hotels in the “Small Center” of Yerevan. Here it is more obvious that three star hotels are densely concentrated in the “Small Center” of Yerevan, and four star hotels are less concentrated and are spread away from the “Small Center” and the two star hotels even further. Three of the seven five star hotels are located in the “Small Center” with the remaining five being located further away. Since there are few five stars hotels we cannot make conclusions about them. 
+In general, from the given distribution of hotels, we can conclude that tourists stay mostly in the center and not in other districts of Yerevan. This supports our initial hypothesis and we can assume that this is because the city center has more attractions and is in a generally better condition than other districts.
+
+\newpage
+
+```{r, fig.width=10, fig.height=7, fig.cap='Hotels Grouped by Price in Yerevan'}
+
+price_grouped1 <- hotels %>% 
+  mutate(group = case_when(
+    between(Price, 0, 15000) ~ "Low",
+    between(Price, 15000, 40000) ~ "Medium",
+    between(Price, 40000, 98000) ~ "High",
+    TRUE ~ NA_character_
+  ))
+
+ggmap(yvn) + 
+  geom_point(data = na.omit(price_grouped1), aes(x = lng, y = lat, color = factor(group, levels = c("High", "Medium", "Low"))), size = 3, alpha = 0.6) +
+  scale_color_brewer(palette = 'Set1') + 
+  labs(color = "Price") + 
+  ggtitle('Hotels Grouped by Price') + ylab('') + xlab('') + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank()) + 
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+
+```
+
+\   
+
+In Figure 4 we see a zoomed out version of the map of Yerevan, with hotels grouped by their prices. It is obvious that a large portion of the hotels are medium priced, and concentrated in the center of the city, with low priced hotels being relatively less and more scattered, and high priced hotels being very scarce. The latter is rather natural since, as we observed above, there are only a few five star hotels.
+
+\newpage
+
+```{r, fig.width=10, fig.height=7, fig.cap='Hotels Grouped by Price in Yerevan (Center)'}
+
+ggmap(yvn_center) + 
+  geom_point(data = na.omit(price_grouped1), aes(x = lng, y = lat, color = factor(group, levels = c("High", "Medium", "Low"))), size = 3.5, alpha = 0.6) + 
+  scale_colour_brewer(palette = "Set1") + 
+  ylab('') + xlab('') + labs(color = "Price") + 
+  theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+```
+
+\   
+
+Figure 5, which is the zoomed in variant of Figure 4, illustrates the above mentioned trend much better for the city center. It is evident that the “Small City” is densely populated with medium priced hotels with only a few high priced hotels, and further away from the center, low priced hotels.
+So, these observations also support our initial hypothesis that in the city center hotels have higher prices and there is more chance to find low priced hotels out of the center.
+
+\newpage
+
+```{r, fig.height=7.5, fig.width=10, fig.cap= 'Hotel Stars & Price Analysis'}
+# STARS VS PRICE CORRELATION PLOTS
+
+starsVSprice <- ggplot(hotels, aes(x = as.factor(`Stars out of 5`), y = `Price`, color = as.factor(`Stars out of 5`))) + 
+  geom_jitter() +
+  scale_colour_brewer(palette = "Set1") +
+  ggtitle('Distribution of Hotels Grouped by Stars') + 
+  theme_bw() + 
+  theme(legend.position = 'None') + xlab('Stars out of 5')
+
+bar_plot <- na.omit(hotels) %>%
+  group_by(`Stars out of 5`) %>%
+  summarise(mean = mean(Price),
+            n = n(),
+            sd = sd(Price)) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  ggplot(aes(x = `Stars out of 5`, y = mean, fill = as.factor(`Stars out of 5`))) + 
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_errorbar(aes(x = `Stars out of 5`, ymin = mean - se, ymax = mean + se), width = 0.5, size = 1) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_brewer(palette = "Set1") + 
+  labs(x = "Stars out of 5", y = "Average Price") + 
+  ggtitle('Average Prices for Different Hotel Stars')
+
+
+plot_grid(
+  starsVSprice, bar_plot,
+  align = "v", nrow = 2
+)
+```
+
+\   
+
+As we saw in the previous plots, the city center is mostly populated with hotels having higher prices and more stars. So, we can assume that these two variables are related. To check that and to get more evidence supporting our hypothesis we can examine Figure 6 in which  bar plot show that the stars and prices of hotels are positively correlated. The errorbars show one standard error around the mean. As we can see, two, three, and four starred hotels have errorbars which are not large, indicating that their price observations are close to their means. Five starred hotels on the other hand has a larger errorbar, indicating a larger deviation from the mean. As for the one starred hotel category, we can see that it has no errorbar since we only have one observations. So, the uncertainties for the estimated means for two, three and four starred hotels are much less in comparison to five starred hotels. In conclusion, the more stars a hotel has the higher is its price. Also from Figure 6 we can see that most of the hotels have three stars and their average price is approximately 20000 AMD. So, most of the hotels are affordable and even located in the center. We can see the distributions of prices for the different star categories in the scatter plot.
+
+\newpage
+
+```{r, fig.height=7.5, fig.width=10, fig.cap = 'Scatter Plots & Regression Lines for Given Variables '}
+
+Q1 <- quantile(hotels$Price, probs=c(.25, .75), na.rm = TRUE)
+Q2 <- quantile(hotels$`Nearby Resaurants`, probs=c(.25, .75), na.rm = TRUE)
+Q3 <- quantile(hotels$`Nearby Attractions`, probs=c(.25, .75), na.rm = TRUE)
+iqr1 <- IQR(hotels$Price, na.rm = TRUE)
+iqr2 <- IQR(hotels$`Nearby Resaurants`, na.rm = TRUE)
+iqr3 <- IQR(hotels$`Nearby Attractions`, na.rm = TRUE)
+
+eliminated<- subset(hotels, hotels$Price > (Q1[1] - 1.5*iqr1) & hotels$Price < (Q1[2]+1.5*iqr1) &
+                      hotels$`Nearby Resaurants` > (Q2[1] - 1.5*iqr2) & hotels$`Nearby Resaurants` < (Q2[2]+1.5*iqr2) &
+                      hotels$`Nearby Attractions` > (Q3[1] - 1.5*iqr3) & hotels$`Nearby Attractions` < (Q3[2]+1.5*iqr3))
+
+
+
+priceVSrestaurants <- eliminated %>% filter(`Nearby Resaurants` > 0) %>%
+ggplot(aes(x = `Price`, y = `Nearby Resaurants`)) + geom_point(alpha = 0.6) + theme_bw() + geom_smooth(method = 'lm')
+
+priceVSattract <- eliminated %>% filter(`Nearby Attractions` > 0) %>%
+ggplot(aes(x = `Price`, y = `Nearby Attractions`)) + geom_point(alpha = 0.6) + theme_bw() + geom_smooth(method = 'lm')
+
+attractVSrest <- ggplot(eliminated, aes(x = `Nearby Attractions`, y = `Nearby Resaurants`)) + geom_point(alpha = 0.6) + theme_bw() + geom_smooth(method = 'lm')
+
+ratingcountVSattract <- ggplot(eliminated[eliminated$`Rating Count`!=0,], aes(x=`Price`, y = `Rating Count`)) +
+  geom_point(alpha = 0.6) + theme_bw() + geom_smooth(method = "lm")
+
+plot_grid(
+  priceVSrestaurants, priceVSattract, attractVSrest, ratingcountVSattract,
+  align = "v", nrow = 2
+)
+
+```
+
+\   
+
+In Figure 7 we can observe a couple of scatter plots, showing relationships between given variables. We removed the outliers for the price, nearby restaurants count and nearby attractions count by calculating the ranges for outliers using the formula [Q1-(1.5)IQR] and [Q3+(1.5)IQR]. In the first plot, we can observe the relationship between hotel price and nearby restaurants count. As we can see, the correlation between these two variables is almost zero. In the second plot, we can observe the relationship between hotel price and nearby attractions count. Again, the correlation between these two variables is almost zero. In the third plot, we can observe the relationship between nearby attractions count and nearby restaurants count. It is obvious that there is a strong positive correlation between these two variables with a low level of uncertainty, indicating that the more attractions there are in a certain area, the more the restaurants. To sum up, the more attractions there are in a given area, it is very likely to have more restaurants nearby and price of hotels does not have any relationship with the amount of nearby restaurants and attractions. In a plot displaying relationship between rating count and price we can see slight connection, expensive hotels having higher number of reviews which could be explained by better marketing.
+
+\newpage
+
+```{r, fig.height=7, fig.width=8, fig.cap='Correlation Heatmap'}
+
+heatmap_df <- hotels
+heatmap_df <- na.omit(heatmap_df)
+heatmap_df = subset(heatmap_df, select = -c(`Hotel Names`, `lat`, `lng`))
+cormat <- round(cor(heatmap_df),2)
+
+ggcorrplot(cormat,
+           hc.order = TRUE,
+           type = "lower",
+           outline.color = "white",
+           lab = TRUE)
+```
+
+\   
+
+Figure 8 is a correlation heatmap which shows the exact values of correlations between all the variables from the dataset of hotels. It supports our previous observation that the variables “Price” and “Stars out of 5” are positively correlated and the correlation is 0.46. Also, it can be seen that the correlation between “Nearby Attractions” and “Nearby Restaurants” is 0.97 which means that these variables have a very high positive correlation. This is logical because both the number of attractions and restaurants depend on the location of the hotel. As discussed above it is surprising that the variables “Rating” and “Stars out of 5” have no correlation, the plot also shows that their correlation is almost zero. 
+So, the heatmap mainly shows expected results which support our observations.
+
+\newpage
+
+```{r}
+restaurants <- restaurants %>% arrange(desc(`Rating`)) %>% filter(`Rating` > 0 & Longitude != min(Longitude))
+
+restaurants_filtered <- restaurants
+restaurants_filtered$Rating[restaurants_filtered$Rating == 2.5] <- 2
+restaurants_filtered$Rating[restaurants_filtered$Rating == 3.5] <- 3
+restaurants_filtered$Rating[restaurants_filtered$Rating == 4.5] <- 4
+```
+
+```{r}
+yerevan2 <- c(min(restaurants_filtered$Longitude), min(restaurants_filtered$Latitude), max(restaurants_filtered$Longitude), max(restaurants_filtered$Latitude))
+yvn2 <- get_map(location = yerevan2, source="osm", zoom = 13)
+```
+
+
+
+```{r, fig.height=8, fig.width=12, fig.cap= 'Restaurants Grouped by Rating in Yerevan'}
+
+map_zoomedOut2 <- ggmap(yvn2) + 
+  geom_point(data = restaurants_filtered, aes(x = Longitude, y = Latitude, color = as.factor(Rating)), size = 2, alpha = 0.9) + 
+  scale_colour_brewer(palette = "Set1") + 
+  ylab('') + xlab('') + 
+  labs(color = "Rating") + 
+  theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+map_zoomedOut2
+```
+
+\   
+
+In Figure 9 a zoomed out version of Yerevan is observed. The plot shows restaurant locations colored by their rating out of five. Given that there are more restaurants than hotels (approximately four times more), there are more points on the map, which is why with figure 8 we can see only a general trend rather than give a detailed analysis. Here we can clearly see that the city center is densely populated by restaurants having ratings of three and four, with restaurants having rating five being more scattered apart. Also, most restaurants are found within the city center, when compared to other districts of the city. Interestingly however, the districts mainly contain restaurants with ratings four and five.
+
+\newpage
+
+```{r, fig.height=8, fig.width=12, fig.cap= 'Restaurants Grouped by Rating in Yerevan (Center)'}
+
+map_zoomedIn2 <- ggmap(yvn_center) + 
+  geom_point(data = restaurants_filtered, aes(x = Longitude, y = Latitude, color = as.factor(Rating)), size = 3.25, alpha = 0.7) + 
+  scale_colour_brewer(palette = "Set1") + 
+  ylab('') + xlab('') + 
+  labs(color = "Rating") + theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+map_zoomedIn2
+```
+
+\   
+
+Figure 10 shows the above mentioned trend much better for the city center. We see that there are more restaurants having ratings of four and five in the city center but as mentioned above they are more scattered  than the restaurants having rating three. Also it is obvious that there are restaurants along almost all of the streets in the “Small Center” of Yerevan. And the number of restaurants drastically decreases as we get out of the  “Small Center” of Yerevan. 
+
+\newpage
+
+```{r}
+yerevan_center2 <- c(44.505, 40.17, 44.526, 40.19)
+yvn_center2 <- get_map(location = yerevan_center2, source="osm")
+```
+
+```{r, fig.width=10, fig.height=7, fig.cap= 'Restaurants & Hotels in Yerevan (Center)'}
+# RESTAURANTS AND HOTELS TOGETHER
+
+ggmap(yvn_center2) + 
+  geom_point(data = restaurants, aes(x = Longitude, y = Latitude), size = 3, alpha = 0.6) +
+  geom_point(data = hotels, aes(x = lng, y = lat), color = "red", size = 3.25, alpha = 0.7) +
+  scale_colour_brewer(palette = "Set1") + 
+  ylab('') + xlab('') + 
+  labs(color = "Rating") + theme_bw() + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+\ 
+
+In Figure 11 we can observe the city center with both hotels and restaurants plotted (red for hotels, black for restaurants). With this visualization we can clearly see that for almost all hotels in "Small City", there is at least one nearby restaurant. So, hotels are clustered together with restaurants and tourists will be able to go to a restaurant within walking distance from their hotel.
+
+\newpage
+
+### Clustering
+
+```{r, fig.height=8, fig.width=12, fig.cap= 'Clustering Hotels'}
+artwork <- read.csv("artwork.csv")
+attraction <- read.csv("attraction.csv")
+monument <- read.csv("monument.csv")
+museum <- read.csv("museum.csv")
+###
+clothes <- read.csv("clothes.csv")
+shoes <- read.csv("shoes.csv")
+supermarket <- read.csv("supermarket.csv")
+metro <- read.csv("metro.csv")
+stops <- read.csv("stops.csv")
+hotels <- read.csv("hotels.csv")
+hotels <- na.omit(hotels)
+restaurants <- read.csv("restaurants.csv")
+restaurants <- na.omit(restaurants)
+set.seed(1)
+clusterize <- function(data, botlat, toplat, leftlong, rightlong, k) {
+    newdat <- data %>% filter(latitude <= toplat & latitude >= botlat,
+                              longitude <= rightlong & longitude >= leftlong)
+    pos <- cbind(newdat$latitude, newdat$longitude)
+    cluster <- kmeans(pos, k)
+    return(cluster$centers)
+}
+
+trans <- rbind(metro,stops)
+combined <- rbind(clothes, shoes, supermarket, metro, stops, artwork, attraction, monument, museum)
+botlat <- min(df$lat)
+toplat <- max(df$lat)
+leftlong <- min(df$lng)
+rightlong <- max(df$lng)
+
+transclust <- clusterize(trans, botlat, toplat, leftlong, rightlong, 5)
+comboclust <- clusterize(combined, botlat, toplat, leftlong, rightlong, 5)
+superclust <- clusterize(supermarket, botlat, toplat, leftlong, rightlong, 5)
+  
+base <- qmplot(x=lng, y=lat, data=df, source="osm", geom = "blank")+
+  geom_point(mapping=aes(color=as.factor(clusters$cluster)), size = 4, alpha = 0.5)+
+  geom_point(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2]), shape = 7, size = 7)+
+  geom_text(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2], label = "Hotel"), vjust=-1)+theme(legend.position = "none")
+
+transplot <- qmplot(x=lng, y=lat, data=df, source="osm", geom = "blank")+
+  geom_point(mapping=aes(color=as.factor(clusters$cluster)), size = 4, alpha = 0.5)+
+  geom_point(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2]), shape = 7, size = 7)+
+  geom_text(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2], label = "Hotel"), vjust=-1)+
+  geom_point(data = as.data.frame(transclust),
+                               mapping = aes(x=transclust[,2],
+                                             y=transclust[,1]),
+                               size = 7, shape = 13,color = "darkblue")+
+  geom_text(data = as.data.frame(transclust),
+                              mapping = aes(x=transclust[,2],
+                                            y=transclust[,1], label = "Transport"), vjust=-1)+
+  theme(legend.position = "none")
+
+superplot <- qmplot(x=lng, y=lat, data=df, source="osm", geom = "blank")+
+  geom_point(mapping=aes(color=as.factor(clusters$cluster)), size = 4, alpha = 0.5)+
+  geom_point(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2]), shape = 7, size = 7)+
+  geom_text(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2], label = "Hotel", size = 5), vjust=-1)+
+  geom_point(data = as.data.frame(superclust),
+                               mapping = aes(x=superclust[,2],
+                                             y=superclust[,1]),
+                               size = 7, shape = 13,color = "darkgreen")+
+  geom_text(data = as.data.frame(superclust),
+                              mapping = aes(x=superclust[,2],
+                                            y=superclust[,1], label = "Market"), vjust=-1)+
+  theme(legend.position = "none")
+
+comboplot <- qmplot(x=lng, y=lat, data=df, source="osm", geom="blank")+
+  geom_point(mapping=aes(color=as.factor(clusters$cluster)), size = 4, alpha = 0.5)+
+  geom_point(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2]), shape = 7, size = 7)+
+  geom_text(data = as.data.frame(clusters$centers), mapping=aes(x=clusters$centers[,1], y=clusters$centers[,2], label = "Hotel", size = 5), vjust=-1)+
+  geom_point(data = as.data.frame(superclust),
+                               mapping = aes(x=comboclust[,2],
+                                             y=comboclust[,1]),
+                               size = 7, shape = 13,color = "darkred")+
+  geom_text(data = as.data.frame(comboclust),
+                              mapping = aes(x=comboclust[,2],
+                                            y=comboclust[,1], label = "Combo"), vjust=-1)+
+  theme(legend.position = "none")
+
+
+plot_grid(base, transplot, superplot, comboplot,
+  align = "v", nrow = 2, ncol = 2, labels = c("Only Hotels", "Public Transport", "Supermarkets", "All Combined")
+)
+```
+
+Using the KNN algorithm for clustering and trying different clustering parameters (number of clusters), we got the desired result with 5 groups. Using additional data from OpenStreetMaps we try to explain the locations of clusters and cluster centers:
+
+* Base - with 5 clusters the city is divided into 4-5 direction, Northern part (close to Cascade), Eastern part (Kond, Proshyan), Western part (Charents street) and two parts that divide the middle and continue towards south which can be associated with Republic Square and Pushkin-Abovian intersection.
+
+* Public Transport - another 5 clusters which were constructed using bus stops and metro stations. We see that the cluster centers encapsulate the city and there is no real tendency towards the hotels. It looks more like the public transport infrastructure is more about avoiding city center, still main entrances to the city are covered.
+
+* Supermarkets - 3 out of 5 cluster centers are almost touching the Hotel cluster centers, we can assume some kind of connection. The two other cases can be explained either by very expensive rent for a shop or lack of customers line in the eastern side of town where points are more dispersed.
+
+* Combined - when we combine the above data with tourism datasets which include monuments, museums, attractions etc. we get our final cluster center map. Here we can see that 4 out of 5 cluster centers are in very close proximity with Hotel cluster centers. Since the combined data includes the locations of particular interest to tourists we can assume that there is a connection.
+
+
+
+\newpage
+
+## Conclusion and Recommendations
+
+From the start our hypothesis was that tourist activity will be high in the center of Yerevan and it will decrease as we go farther away. We assumed there is a connection between the development and tourist activity. We know that Armenia attracts a lot of tourists because its history. However cities other than the capital are not nearly as developed in outside basic necessities, while tourists need somewhere to relax, shop and site-visit.
+
+Armenia has a lot of cities that have enough monuments, museums, attractions etc, in order to develop tourism however as stated there are no shops, no transportation and no attractions. Taking Yerevan as an example of a tourism center we a good suggestion would be to develop transportation and public attractions/museums/monuments. This will drive tourists to those locations creating opportunity for local business owners to establish hotels and open up shops bringing diversity to tourism in Armenia.
+
+
+\newpage
+## References
+
+Jovanoic, V., V.K, &amp; Njegus, A., N.J. (2008). THE APPLICATION OF GIS AND ITS COMPONENTS IN TOURISM. Yugoslav Journal of Operations Research, 18. doi:10.2298/YUJOR0802261J
+
+Harutyunyan, L., L.H. (2020, February 20). Tourism in Armenia: The numbers are growing but there is no boom. Retrieved November 21, 2020, from https://fip.am/en/10472
+
+Tovmasyan, G., G.V, &amp; Tovmasyan, R., R.T. (2018). Tourism Development Trends in Armenia. Tourism Education Studies and Practice, 5(1). doi:10.13187/tesp.2018.1.20
+
+Saakyan, I., I.S. (2020). CURRENT EXPERIENCE AND ACTUAL ISSUES OF DEVELOPMENT OF TOURISM IN THE REPUBLIC OF ARMENIA [Abstract]. Sciences of Europe, 5(3162-2364), 71-74.
+
+
+
+
+## Appendix

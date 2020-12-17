@@ -1,0 +1,315 @@
+---
+title: "Exploration of Airbnb Listings Database of New York"
+author: "Arman Azizyan"
+date: "8/12/2020"
+toc: True
+output: pdf_document
+---
+
+\newpage
+# Introduction
+
+Parallel to evolution of transportation the travel opportunities have increased to heights never achieved before. You can fly half way around the globe with a price of fuel that would get you to neighboring country. The time of travel is decreasing with newer airplanes and high speed trains. With this the hotel industry has the chance to gain a lot of profit by letting travelers and tourists stay at their numbers.
+
+However the faster developing information technologies allowed the birth of hotel's worst fear, online renting platforms. Airbnb which is one of the most notable and one of the first companies that used the connectivity of internet as means of connecting people who have free or spare rooms, apartments or houses with people that were looking for a place to stay. Since then the service has evolved into global network which rivals with hotels with cheaper prices, comfier rooms and hosts with personalities rather than a reception desks.
+
+In this project I will use Airbnb listings in New York to gain some insight about the pricing in New York and differences between neighborhoods of New York. I also have an opportunity to test the obvious hypothesis that renting a room is cheaper than renting an entire apartment.
+
+# Research Methodology
+
+In order to understand the distribution of listings around New York I had to find data that carried spatial information (GPS coordinates or Addresses). Then I would use packages that would allow visualizations (ggplot2) and other visualizations for other categorical and continuous data.
+
+## Data
+
+I found the data on Kaggle website. The data had been cleaned and was easy to work on. Factorizing categorical data might make it easier to work, however it was not a necessity. Later I found a website that provides Airbnb listing data for several cities http://insideairbnb.com/new-york-city/ (Yerevan was not one of them unfortunately). The data has enough observations to be comfortable with analysis (about 50k listings).
+
+## Visualizations
+
+GGMap package will be used to create maps with different overlays. The overlays will mainly consist of two dimensional densities and bins (grid) with different summaries. Other visualizations such as barplots, boxplots and violin plots may be used to showcase connections between categorical and continuous variables.
+
+## Analysis
+
+The analysis will be mainly done through visual observations which raises the importance of choosing correct visualization techniques and their interpretations. Some of the visualizations will use transformed or filtered data to emphasize and support the interpretations and conclusions.
+
+# Literature Review
+
+An article about Airbnb pricing tool algorithm (Hill, 2015) written by one of the developers in Airbnb goes into detail about what goes into suggesting a price for a listing. They found some of the characteristics that has big impact on price. He lists some of the characteristics like events during that time, area and room type, utilities, internet connection and location. The algorithm comes up with a suggestion of a price to help users to gain profit without underpricing or overpricing their listing. Their approach when it came to location based pricing they viewed at the historical data of previous listing and prices then combined those listing into neighborhoods based on location and construction type. That allowed to measure the value of the specific neighborhoods without necessarily visiting or appraising the appartments in each area. This means that during the analysis I should find neighborhoods that have a lot of high priced or low priced listings.
+
+A similar project done by a group of students (guessing) from Columbia University using similar dataset with some differences in variables analyzed pricing, rating and host rating of airbnb listings in New York. They used customer ratings and reviews combination of location data to develop beautiful shiny dashboard (I envy them) and create great visualizations with wordclouds (I suggest adding it into this course) and interactive maps. They also used date of listings to analyze the seasonality and temporal tendencies. I will try my best to integrate some of these ideas in my future projects, but for now I will try to get some motivation from hypothesis' they tested. I also think that this work presents an example of good report.
+
+An article that analyzed airbnb data in Budapest (Gábor Dudás, Lajos Boros, Tamás Kovalcsik, & Balázs Kovalcsik, 2017) used ArcGIS software to perform their analysis by converting the point data to rasters. Rasterizing data allows calculations on every pixel. Rasters are pictures with a value connected to each pixel that represents a continuous variable. Using several rasters the software can do calculations by calculating new pixel values using original values from each raster to create a new raster with output of the formula. Another advantage of using rasters is the multiband raster representation where different order of rasters overlaid one over another may emphasize areas of interests. I am yet to find a package that allows to easily manipulate and work with rasters in R.
+
+# Hypothesis
+
+* Locations with high density (amount) of listings should have lower average price due to supply and demand rule.
+* Which neighborhood has highest prices, what are the room type proportions?
+* Single/private rooms are cheaper than entire apartments.
+* There are commercial companies that work through Airbnb.
+* What is the connection between number of reviews and price?
+
+
+# Analysis
+
+The dataset was mainly populated with listings from Manhattan and Brooklyn so for some of the visualizations I filtered locations of the listings to create clearly interpretable maps.
+
+For density maps I also randomly sampled data to make the density calculation faster.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                      fig.width=6, fig.height=3, fig.align = 'center')
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggmap)
+library(ggpubr)
+```
+
+
+```{r}
+data <- read.csv("AB_NYC_2019.csv")
+
+#str(data)
+# head(data, 5)
+# min(data$latitude)
+# max(data$latitude)
+# min(data$longitude)
+# max(data$longitude)
+mylocation <- c(-74.21, 40.59, -73.65, 40.9)
+
+set.seed(100)
+newdata <- data[sample(nrow(data), 1000),]
+bp <- boxplot(data$price, plot = F)
+dataout <- data[data$price<min(bp$out),]
+```
+
+```{r}
+df <- data %>% filter(latitude<=40.78 & latitude>=40.675,
+                         longitude<= -73.9 & longitude>-74.05)
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", contour = T, color = "grey80", alpha = .1, color = NA)+
+  scale_fill_gradient2("Aribnb Listings", 
+                       low = "white", 
+                       mid = "red", 
+                       high = "darkred")+
+  ggtitle("Listing Density")
+```
+
+The above graph shows the density of listings. We can observe four peaks of density, two in Manhattan and another two in Brooklyn.
+The peaks in density in Manhattan are a block away from Times Square and the northern part of Bowery (Ukrainian Village) which is a high density residential area with a metro station close by.
+The peaks in Brooklyn are a residential area with near Bedford ave. metro station and another centered at Woodhull Hospital.
+
+```{r}
+
+df1 <- dataout %>% filter(latitude<=40.78 & latitude>=40.675,
+                         longitude<= -73.9 & longitude>-74.05)
+qmplot(x=longitude, y=latitude, data=df1, maptype = "toner-background", geom = "blank")+
+  stat_summary_2d(mapping = aes(z=price), bins = 40, geom="tile", drop = T, fun = "mean", alpha = 0.8)+
+  scale_fill_gradient2("Average Price", 
+                       low = "white", 
+                       mid = "green", 
+                       high = "red")+
+  ggtitle("Average Price")+
+  stat_density_2d(data = df, aes(x=longitude, y=latitude), geom = "density_2d", contour = T, color = "black", alpha = 0.3, color = NA)
+  
+
+```
+
+The tile plot shows the average price for the listings. The data is trimmed 5% from both top and bottom sides to get better contrast of values. We can observe that in general the prices in Manhattan are higher than in Brooklyn. The prices are also higher for listings near the coasts and near the bridges. When it comes to the points with high density we can observe a buffer zone where the prices are a bit lower than coasts. We can also see that listings along the Broadway are higher while the density of listings were lower.
+
+In both Manhattan and Brooklyn we can se low density areas where the average price is higher than in locations with high density. The connection may not be a causation but there is sure some correlation there.
+
+```{r}
+ggplot(dataout, mapping = aes(x=price, y=..density..))+
+  geom_histogram(bins = 50, fill ="azure2", color = "black")+
+  theme_bw()+
+  labs(title = "Price Distrsibution", x="Price", y="Number of Listings")+
+  geom_density(data = dataout, mapping = aes(x=price))+
+  theme(panel.border = element_blank())
+```
+
+The distribution of listings by price represents Weibull distribution with low count near $0. Some spikes can be seen around round numbers (50, 75, 100 etc) which can be smoothed by adding noise in the data however it is not crucial for this analysis. it would help when trying to fit a distribution.
+
+
+```{r}
+bar1 <- ggplot()+
+  stat_count(data=dataout, mapping = aes(x=neighbourhood_group, fill=room_type), color="black")+
+  theme_bw()+
+  labs(y= "Number of listings",
+       fill = "Room Types")+coord_flip()+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.y = element_blank(),
+                   axis.title.y=element_blank())
+
+bar2 <- ggplot()+
+  stat_count(data=dataout, mapping = aes(x=neighbourhood_group, fill=room_type), position = "fill",
+             color="black")+
+  theme_bw()+
+  labs(y= "Portion of Listings",
+       fill = "Room Types")+coord_flip()+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.y = element_blank(),
+                   axis.title.y=element_blank())
+
+ggarrange(bar1, bar2, nrow = 2, common.legend = T)+
+  ggtitle("Neighborhoods by Room Types")
+```
+
+When it comes to listings Manhattan is leading by total number by a hair. We can also see that Brooklyn has more private rooms for rent than Manhattan and the opposite for apartments.
+
+```{r}
+dataout %>% group_by(neighbourhood_group) %>% summarise(mean=mean(price), sd = sd(price)) %>%
+  ggplot(mapping = aes(x=neighbourhood_group, y= mean))+
+  geom_bar(stat="identity", fill = "azure2", color = "black", size = 1)+
+  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+
+  theme_bw()+
+  geom_violin(data=dataout, aes(x=neighbourhood_group, y = price), fill = NA)+
+  labs(title="Mean Price and Price Distribution by Neighborhood (bars show mean)")+xlab("")+ylab("Price")+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())
+```
+
+Highest average price is in Manhattan, the standard deviation indicated by an error bar shows no significant difference between neighborhoods. From the violin plots that Manhattan has more points above mean. Violin plots also help us to see that in fact the deviation would be highest in Manhattan if there were no extreme values in other boroughs.
+
+
+```{r}
+dataout %>% group_by(room_type) %>% 
+  summarise(mean=mean(price), sd = sd(price)) %>%
+  ggplot(mapping = aes(x=room_type, y= mean))+
+  geom_bar(stat="identity", fill = "azure2", color = "black", size = 1)+
+  geom_errorbar(mapping = aes(ymin= mean, ymax=mean+sd), width = 0.3, size = 1)+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())+
+  labs(title = "Price Distribution by Room Type (bars show mean)", x="Room Type", y="Price")+
+  geom_violin(data=dataout, mapping = aes(x=room_type, y= price), fill=NA)
+```
+
+The Price standard deviation for apartments is slightly higher but not significantly. The average price however for apartment is double of that for private rooms. We can confirm our initial intuition that apartments in fact are more expensive. We still need to note that even without outliers there are private rooms that are more expensive than most of the apartments which should be a bit bizarre.  
+
+```{r}
+ggplot(data = dataout, aes(x=price, y=..density.., fill = as.factor(room_type)))+
+  geom_density(alpha = 0.5, color=NA)+
+  theme_bw()+
+  labs(title = "Price Distribution for Room Types",
+       x= "Price",
+       y= "Density",
+       fill = "Room Types")+
+  theme(panel.border = element_blank())
+```
+
+Here we can see clear difference between distribution of prices for different room types this again confirms our initial assumption.
+
+```{r}
+dataout %>% arrange(desc(calculated_host_listings_count)) %>% distinct(host_id, host_name, calculated_host_listings_count) %>% head(5) %>%
+  ggplot(mapping = aes(x=calculated_host_listings_count, 
+                       y=reorder(host_name,calculated_host_listings_count)))+
+  geom_bar(stat = "identity", fill = "azure2", color="black", size = 1)+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.y = element_blank())+
+  labs(title = "5 Hosts with Highest Listing Numbers",
+       x="Number of Listings", y="")
+  
+```
+
+With a quick google search we can confirm that companies Sonder and Blueground have their own business however they still use the airbnb platform to reach out to tourists and tenants.
+
+```{r}
+dataout$review <- ifelse(dataout$number_of_reviews<=5, "Less Than 5 Reviews", "More Than 5 Reviews")
+dataout$review <- ifelse(dataout$number_of_reviews==0, "No Reviews", dataout$review)
+
+ggplot(data = dataout, aes(x=review, y=price))+
+  geom_boxplot(fill = "azure2")+
+  labs(title = "Two dimensional density between number of reviews and price",
+       y="Price", x="")+
+  theme_bw()+theme(panel.border = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.grid.major.x = element_blank())
+  
+```
+
+I decided to split the review number data into 3, the split on 5 reviews provided good balance between different categories of number of reviews (0.3:0.5:0.2 split).
+I was expecting to find some at least some difference that could be rationalized, but judging by the boxplots there is no significant difference the different rating categories. I could try to find some differences using violin plots but that would be nitpicking. I was expecting to have lower prices for listings with lower number of reviews but i guess the distributions are very close.
+
+# Conclusion
+
+I expected more listings and higher prices closer to center of New York, in Manhattan and Brooklyn, the results were very close to expectation. Let's give results on hypothesis.
+
+* **Locations with high density (amount) of listings should have lower average price due to supply and demand rule** - We can definitely see some connection between density and average price of listings. The fact that the price in immediate vicinity of high density of listings are lower than further away where the density starts to decrease makes me believe that there is a correlation, however I cannot be sure that there is a causation, since most of the time the dense locations are very basic residential areas with public transport and no other attractions which could mean the value of the apartments are low for the start.
+* **Which neighborhood has highest prices, what are the room type proportions?** - Average price of listings is the highest in Manhattan and majority of listings are apartments with private rooms coming close second.
+* **Single/private rooms are cheaper than entire apartments** - We can stronly confirm this hypothesis due to the average price and distribution differences of listing prices.
+* **There are commercial companies that work through Airbnb** - When exploring the data we found large companies with access to more than 100 rooms/apartments and for some of them they had registered businesses and websites. I am sure that the platform allows listings from businesses and real estate agencies. These businesses value the visibility of of Airbnb platform higher than of their websites which again speaks about the popularity of the platform.
+* **What is the connection between number of reviews and price?** - One of the reviewed articles about price suggestion algorithms mentions that the price difference for different number of reviews, the difference between no reviews and at least 1 review was very huge. However according to my analysis the difference between the distributions of prices for different review numbers was not significant.
+
+\newpage
+# References
+
+Hill, D. (2015, August 20). The Secret of Airbnb’s Pricing Algorithm. IEEE Spectrum: Technology, Engineering, and Science News. https://spectrum.ieee.org/computing/software/the-secret-of-airbnbs-pricing-algorithm
+
+Ankit Peshin, S. G. (2018, 12 10). Exploratory Data Analysis and Visualization of Airbnb Dataset. Retrieved from http://www.columbia.edu/~sg3637/airbnb_final_analysis.html
+
+Dudás, Gábor & Boros, Lajos & Kovalcsik, Tamás & Kovalcsik, Balázs. (2017). The visualization of the spatiality of Airbnb in Budapest using 3-band raster representation. Geographia Technica. 12. 23-30. 10.21163/GT_2017.121.03.
+https://www.researchgate.net/publication/315714846_The_visualization_of_the_spatiality_of_Airbnb_in_Budapest_using_3-band_raster_representation
+
+\newpage
+# Appendix
+
+
+Maps with bigger radius
+
+```{r}
+mylocation3 <- c(-74.05, 40.679, -73.9, 40.78)
+nymap3 <- get_map(location = mylocation3, source = "osm", zoom = 12, crop = F)
+ggmap(nymap3, base_layer = ggplot(data=newdata, mapping = aes(x=longitude, y=latitude)))+
+  stat_density2d(aes(fill= ..density.., alpha = ..density.. ), geom = "tile", contour = F)+
+  scale_fill_distiller(palette = 'Reds', direction = 1, guide = "none")+
+  scale_alpha(range = c(0,0.6))+
+  theme(legend.position = "none")+
+  labs(title = "Listing Density", x="Longitude", y="Latitude")
+
+
+
+```
+
+Bigger Area
+
+```{r}
+
+nymap <- get_map(location = mylocation, source = "osm", zoom = 12, crop = F)
+
+
+ggmap(nymap, base_layer = ggplot(data=newdata, mapping = aes(x=longitude, y=latitude)))+
+  stat_density2d(aes(fill= ..density.. ), geom = "tile", contour = F, alpha= 0.35)+
+  scale_fill_distiller(palette = 'Oranges', direction = 1, guide = "none")
+```
+
+
+Sampled average price
+
+```{r}
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_summary_2d(mapping = aes(z=price), bins = 30, geom="tile", drop = T, fun = "mean", alpha = 0.5)+
+  scale_fill_gradient2("Average Price", 
+                       low = "white", 
+                       mid = "yellow", 
+                       high = "red")+
+  ggtitle("Average Price")
+```
+
+
+Top expensive listings
+
+```{r}
+df <- newdata %>% filter(latitude<=40.78 & latitude>=40.675,
+                         longitude<= -73.9 & longitude>-74.05)
+qmplot(x=longitude, y=latitude, data=df, maptype = "toner-background", geom = "blank")+
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", alpha = .2, color = NA)+
+  scale_fill_gradient2("Aribnb Listings", 
+                       low = "yellow", 
+                       mid = "yellow", 
+                       high = "red")+
+  stat_summary_2d(data=data%>%filter(price>=quantile(price,0.999)),
+                  mapping = aes(z=price/20), bins = 50, geom="tile", drop = T, fun = "mean", alpha = 0.2, color="orangered")+
+  ggtitle("Top 0.1% Most Expensive Listing Locations (More than $3000/night)")
+```

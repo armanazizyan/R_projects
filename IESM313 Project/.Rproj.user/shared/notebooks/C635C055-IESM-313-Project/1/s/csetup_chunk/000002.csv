@@ -1,0 +1,99 @@
+"0","knitr::opts_chunk$set(echo = FALSE)"
+"0","library(ggmap)"
+"2","package ‘ggmap’ was built under R version 3.6.3"
+"2","Loading required package: ggplot2
+"
+"2","Registered S3 method overwritten by 'dplyr':
+  method           from
+  print.rowwise_df     
+"
+"2","Google's Terms of Service: https://cloud.google.com/maps-platform/terms/.
+"
+"2","Please cite ggmap if you use it! See citation(""ggmap"") for details.
+"
+"0","library(ggplot2)"
+"0","library(survival)"
+"2","package ‘survival’ was built under R version 3.6.3"
+"0","library(dplyr)"
+"2","
+Attaching package: ‘dplyr’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+"
+"2","The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+"
+"0","library(chron)"
+"2","package ‘chron’ was built under R version 3.6.3"
+"2","NOTE: The default cutoff when expanding a 2-digit year
+to a 4-digit year will change from 30 to 69 by Aug 2020
+(as for Date and POSIXct in base R.)
+"
+"0","library(survminer)"
+"2","package ‘survminer’ was built under R version 3.6.3"
+"2","Loading required package: ggpubr
+"
+"2","package ‘ggpubr’ was built under R version 3.6.3"
+"2","Loading required package: magrittr
+"
+"2","
+Attaching package: ‘magrittr’
+
+"
+"2","The following object is masked from ‘package:ggmap’:
+
+    inset
+
+"
+"2","Registered S3 method overwritten by 'data.table':
+  method           from
+  print.data.table     
+"
+"0","library(forcats)"
+"2","package ‘forcats’ was built under R version 3.6.3"
+"0","library(shiny)"
+"2","package ‘shiny’ was built under R version 3.6.3"
+"0","library(outliers)"
+"0","library(knitr)"
+"2","package ‘knitr’ was built under R version 3.6.3"
+"0","library(ROCR)"
+"2","package ‘ROCR’ was built under R version 3.6.3"
+"2","Loading required package: gplots
+"
+"2","package ‘gplots’ was built under R version 3.6.3"
+"2","
+Attaching package: ‘gplots’
+
+"
+"2","The following object is masked from ‘package:stats’:
+
+    lowess
+
+"
+"0","library(rpart)"
+"2","package ‘rpart’ was built under R version 3.6.3"
+"0","library(rpart.plot)"
+"2","package ‘rpart.plot’ was built under R version 3.6.3"
+"0","library(e1071)"
+"2","package ‘e1071’ was built under R version 3.6.3"
+"0","library(caret)"
+"2","package ‘caret’ was built under R version 3.6.3"
+"2","Loading required package: lattice
+"
+"2","
+Attaching package: ‘caret’
+
+"
+"2","The following object is masked from ‘package:survival’:
+
+    cluster
+
+"
+"0","library(rmarkdown)"
+"2","package ‘rmarkdown’ was built under R version 3.6.3"

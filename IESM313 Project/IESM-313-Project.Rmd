@@ -1,0 +1,680 @@
+---
+title: "IESM313 Project: GG Taxi Data Analysis"
+author: "Arman Azizyan, Anna Sargsyan"
+date: "5/7/2020"
+output: 
+  html_notebook: 
+    toc: yes
+runtime: shiny_prerendered
+---
+
+***
+
+***
+
+# Abstract
+
+*The project is an assignment as a part of IESM 313 Data Mining and Predictive Analysis. This report describes the motives, data, methods, software, codes. Report will showcase the results and observations concluded. The data was provided within scope of the course with educational purposes and shall not be used commercially.*
+
+*All software and packages used are open source. No license or special permission required.*
+
+***
+
+# Introduction
+
+The scene of public transportation has not changed much from when the idea was invented. Specifically in Armenia it remained the same for several decades. The vehicles may be upgraded or refreshed but the system remains the same and it is objectively flawed. The more convenient mode of transportation is taxi. It was very prestigious employment during the USSR period and remains popular. However the status of the taxis has changed and taxis are profitable as long as they are efficient.
+
+## Motive
+
+Recent burst of IT segments in Armenia did not leave transportation untouched. There were attempts to make public transportation like buses and metro more efficient using IT but all the efforts were in vain. Particularly because the market for those solutions is small, often poor and inert to changes.
+
+With the market for taxis so big and trending companies like Uber similar solutions were put in Armenia. GG was one of the first online taxi companies that was founded and promoted independent drivers to pick up driving taxis. GG made it so there was zero effort to start working and earning a living. This also came with the benefit of using smartphone apps as a dispatch center which made it even easier for newcomers in the field.
+
+We wish to use the information gathered during operation to learn about tendencies of customers and partners, efficiency and capacity of the operation using techniques we learned during the semester. We are hopeful that this project might be useful for any party concerned.
+
+## Prior Knowledge and Data
+
+By prior knowledge we mean understanding of national mentality having lived our lives in Armenia and commuted almost every day. This also includes knowledge on geography of the Yerevan and Armenia. Some of the assumptions in the project are made based on this experience, however we tried our best to not cause bias during our analysis and provide objective explanations.
+
+We had a number of sources for the data. We decided to stop on data provided by our instructor Mr. Madoyan due to its detail. For geospatial needs we used GIS data provided by AUA Acopian Center for Environment[^1].
+
+[^1]: "Acopian Center for the Environment." https://ace.aua.am/.
+
+## Problem Description
+
+There are a number of problems we would like to trample within the scope of our project. Using the data provided we want to make observations about tendencies of customers.
+
+Understanding the tendencies of customers will help to improve the efficiency and capacity of the service. Help drivers to decrease additional costs and improve the network of the service.
+
+* Assess wait times for different regions at different days/times.
+* Survival model for request acceptance/cancelation times.
+* Hotspot analysis of requests based on day/time.
+* Classification of customers based on user tendencies.
+* Prediction of loyalty to firm based on user tendencies.
+
+***
+***
+
+
+
+```{r setup,  include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggmap)
+library(ggplot2)
+library(survival)
+library(dplyr)
+library(chron)
+library(survminer)
+library(forcats)
+library(shiny)
+library(outliers)
+library(knitr)
+library(ROCR)
+library(rpart)
+library(rpart.plot)
+library(e1071)
+library(caret)
+library(rmarkdown)
+```
+
+# Data
+
+GG data contains spatial data about the request origin and destination. The data also contains date-time information which will be used to do survival analysis and visualisation. The fare and distance is used to observe tendencies of users.
+
+## Spatial
+
+We worked with the spatial data in different ways. The main reason for using the spatial data from the start was identifying the regions of calls based on location. Using QGIS software, shapefiles from ACE and a lot of manual work we were able to create more than 30 regions across Armenia and removed all requests outside Armenia. 
+
+## Date Time
+
+We have date-time data for all requests at different stages of completion. This allows us to measure time between request creation and acceptance or cancelation, wait times etc,. 
+
+
+***
+
+# Models
+
+The models and visualisation techniques are used to provide clear and easily consumable information about the data.
+
+## Descriptive Models
+
+Here we will develop models that describe our data and provide useful information about requests of customers of the firm.
+
+### Bar Chart
+
+Using Dplyr, GGplot2 and Shiny packages we aggregate data using different groups and present bar charts for wait times and request numbers according to Regions, weekdays and hour of day. Using this model company, partner or customer can become acclaimed with tendencies of drivers and customers. 
+
+Some outlier values can be noticed, however we decide against removing them from data or from display since they also provide interesting information about the data. Moreover the outliers are easily identified visually and do not distort the overall visualisation. We will encounter cases in the future when outliers are removed to bring more clarity to our graph.
+
+
+```{r}
+load("gg_wait.rda")
+
+gg_wait$wait[which(is.na(gg_wait$wait))] <- 0
+#gg_wait <- gg_wait[-which(gg_wait$Name_Eng %in%
+#  gg_wait%>%group_by(Name_Eng)%>% tally()%>%filter(n<10)
+#),]
+```
+
+
+```{r barchart, echo=F, warning=F, context="render"}
+inputPanel(
+  selectInput("chart", label = "Chart Type",
+              choices = c("Request Number", "Average Wait Time"),
+              selected =c("Average Wait Time")),
+  
+  selectInput("selectday", label = "Weekday",
+              choices = c("Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                          "Sunday"), selected = "Monday"),
+  
+  numericInput("selecthour", label = "Hour",
+              min = 0, max = 23, value = 11, step = 1),
+  radioButtons("order", label = "Ordering",
+               choiceNames = c("Lowest 10", "Highest 10"),
+               choiceValues = c("asc", "desc")
+  )
+)
+
+plotOutput("barplot")
+```
+
+```{r server, context="server"}
+output$barplot <- renderPlot({
+  if(input$chart=="Average Wait Time"){
+        head(gg_wait %>% group_by(Name_Eng, weekday, hour) %>%
+      summarise(avgWait=mean(wait)) %>% 
+        filter(weekday=="Monday", hour==input$selecthour,) %>%
+      arrange(eval(parse(text=ifelse(input$order=="desc", "desc(avgWait)",
+                                     "avgWait")))), 10) %>% 
+    ggplot()+geom_bar(aes(x=reorder(Name_Eng,
+                                -avgWait),
+                          y=avgWait), stat = "identity", 
+                          fill='red', show.legend = F)+
+      xlab("Regions")+
+      ylab("Average Wait Time (minutes)")+
+      theme(axis.text.x = element_text(angle=90, vjust = 0.5))+
+      geom_text(mapping = aes(x=reorder(Name_Eng, -avgWait), 
+                                  y=avgWait, 
+                                  label=round(avgWait, digits = 1)),
+                              vjust=-0.25)+
+      ggtitle("Average Wait Time for Regions")
+  }
+  else{
+    head(gg_wait %>% group_by(Name_Eng, weekday, hour) %>% 
+       tally() %>% filter(weekday==input$selectday, hour==input$selecthour) %>%
+       arrange(eval(parse(text=ifelse(input$order=="desc", "desc(n)",
+                                     "n")))), 10) %>% 
+  ggplot()+geom_bar(aes(x=reorder(Name_Eng, -n), y=n), stat = "identity", fill='red', show.legend = F)+
+  xlab("Regions")+
+  ylab("Number of Requests")+
+  theme(axis.text.x = element_text(angle=90, vjust = 0.5))+
+  geom_text(mapping = aes(x=reorder(Name_Eng, -n), y=n, label=n),
+            vjust=-0.25)+
+  ggtitle("Number of Requests for Regions")
+  }
+})
+```
+
+### Requests Heatmap
+
+Heatmaps are frequently used to do hotspot analysis. Heatmaps can be described as a two-dimensional density plot. It can be used to do hotspot analysis of any 2D data however when working with spatial data we want our axis to be geographic coordinates. Using GGmaps, GGplot2 and Shiny a heatmap was developed for Yerevan and for Center (downtown) Yerevan. We use OpenStreetMap as our ground layer for the map. It may seem a bit outdated but it won’t affect our heatmap. GoogleMap alternative requires registration for an API while OSM is open source so we stick with OSM.
+
+
+```{r heatmap osm, include=FALSE, echo = FALSE, warning=F, results='hide', context="render"}
+
+load("gg_hs.rda")
+
+gg_hs_yer <- gg_hs[which((gg_hs$originLat>40.121536 & gg_hs$originLat<40.253258)&
+                           (gg_hs$originLng>44.406649 & gg_hs$originLng<44.632371)),]
+yer_map <- get_map(location = c(left=44.406649, bottom=40.121536,
+                                right=44.632371, top=40.253258), source = "osm")
+gg_hs_yer$hour <- as.numeric(gg_hs_yer$hour)
+
+cen_map <- get_map(location = c(left=44.484668, bottom=40.167279,
+                                right=44.530867, top=40.195068), source = "osm")
+gg_hs_cen <- gg_hs[which((gg_hs$originLat>40.167279 & gg_hs$originLat<40.195068)&
+                           (gg_hs$originLng>44.484668 & gg_hs$originLng<44.530867)),]
+gg_hs_cen$hour <- as.numeric(gg_hs_cen$hour)
+```
+
+
+```{r heatmap, echo=FALSE}
+
+
+inputPanel(
+
+             selectInput(inputId = "map", 
+                         label = "Map", 
+                         choices = c("Yerevan", "Center")
+             ),
+             
+             sliderInput("hours",
+                           "Hours:",
+                           min = 0,
+                           max = 23,
+                           value = c(10, 14),
+                           round =T),
+            
+             selectInput(inputId = "weekdays",
+                                choices = c("Monday",
+                                            "Tuesday",
+                                            "Wednesday",
+                                            "Thursday",
+                                            "Friday",
+                                            "Saturday",
+                                            "Sunday"),
+                                label = "Weekdays"
+                                )
+    
+)
+
+plotOutput("heatmap")
+
+    
+```
+
+
+```{r heatmapplot, context="server"}
+output$heatmap <- renderPlot({
+      if(input$map=="Yerevan")
+             {ggmap(yer_map)+stat_density2d(data = gg_hs_yer[which(gg_hs_yer$hour %in% c(input$hours)&
+                                                                     gg_hs_yer$weekday %in% c(input$weekdays)),],
+                                            aes(y=originLat, x=originLng, fill=..level..), 
+                                    geom = 'polygon', size=0.1, bins=10, alpha=0.3)+
+        scale_fill_distiller(palette = 'RdYlGn', direction = -1)
+      }
+      else
+        {
+          ggmap(cen_map)+stat_density2d(data = gg_hs_cen[which(gg_hs_cen$hour %in% c(input$hours) &
+                                                                 gg_hs_cen$weekday %in% c(input$weekdays)),], aes(y=originLat, x=originLng, fill=..level..), 
+                                      geom = 'polygon', size=0.1, bins=10, alpha=0.3)+
+          scale_fill_distiller(palette = 'RdYlGn', direction = -1)
+        }
+    })
+```
+
+# Statistical Models
+
+## Kaplan Meier Survival Model
+In order to evaluate and develop a survival model for our request calls we use the Kaplan Meier model. This is the most suitable model for our data since we do not have many explanatory variables and as far as we know there are no censored data.
+
+On further investigation we notice that the survival curve of acceptance time as well as cancelation time of requests is not different between regions.
+
+```{r survmodel, echo=FALSE, include=FALSE}
+
+load("gg.rda")
+str(gg)
+
+gg_arrived <- data.frame()
+gg_cancel <- data.frame()
+
+gg_cancel <- gg[complete.cases(gg$canceled_a), c("orderId", "created_at", "canceled_a", "Name_Eng")]
+gg_arrived <- gg[complete.cases(gg$arrived_at), c("orderId", "created_at", "accepted_a", 
+                                                  "arrived_at","processing", "completed_",
+                                                  "Name_Eng")]
+
+gg_cancel$wait_time <- as.numeric(gg_cancel$canceled_a-gg_cancel$created_at)
+gg_cancel$weekday <- weekdays.POSIXt(gg_cancel$created_at)
+gg_cancel$hour <- strftime(gg_cancel$created_at, format = "%H")
+
+gg_arrived$accept_time <- as.numeric(gg_arrived$accepted_a-gg_arrived$created_at)
+
+cancel_surv_obj <- Surv(time = gg_cancel$wait_time)
+cancel_km <- survfit(cancel_surv_obj~1, data=gg_cancel)
+#summary(cancel_km)
+cancel_km_region <- survfit(cancel_surv_obj~Name_Eng, data=gg_cancel)
+
+box <- boxplot(gg_arrived$accept_time, plot = F)
+head(box$out)
+summary(box)
+# head(gg_arrived[-which(gg_arrived$accept_time %in% box$out),])
+# head(gg_cancel)
+# head(gg_arrived)
+gg_accept <- gg_arrived[-which(gg_arrived$accept_time %in% box$out),]
+# head(gg_accept)
+accept_surv_obj <- Surv(time = gg_accept$accept_time)
+accept_km <- survfit(accept_surv_obj~1, data=gg_accept)
+# 
+# accept_km_regions <- survfit(accept_surv_obj~Name_Eng, data=gg_accept)
+# ggsurvplot(accept_km, conf.int = F)
+
+plotOutput("surv")
+```
+```{r survout,}
+plotOutput("surv")
+```
+
+```{r survplot, context="server" }
+# ggsurvplot(accept_km_regions[which(accept_km_regions$n>10000)], conf.int = F)
+# ggsurvplot(accept_km, conf.int = F)
+output$surv <- renderPlot({plot(accept_km, conf.int = F, ylab = "Survival Probability",
+                 xlab = "Time (Seconds)", col='red')})
+# plot(cancel_km)
+# plot(accept_km)
+```
+
+
+## Clustering
+
+
+
+```{r Darda_bayc_petqa_dimananq, include = FALSE, context="render"}
+# load("gg_new.rds")
+# gg_new$created_at <- as.POSIXct(gg_new$created_at)
+# gg_new$canceled_a <- as.POSIXct(gg_new$canceled_a)
+# gg_new$accepted_a<- as.POSIXct(gg_new$accepted_a)
+# gg_new$processing <- as.POSIXct(gg_new$processing)
+# gg_new$arrived_at <- as.POSIXct(gg_new$arrived_at)
+# 
+# save(gg_new, file = "gg_new.rds")
+
+load("gg_new.rds")
+str(gg_new)
+
+##Extracting weekdays, hours and month for orders ##
+gg_new$weekday <- weekdays.POSIXt(gg_new$created_at)
+gg_new$hour <- strftime(gg_new$created_at, format = "%H")
+gg_new$month <- months.POSIXt(gg_new$created_at)
+gg_new$hour <- as.numeric(gg_new$hour)
+
+##Calculating customer wait time ##
+gg_new$cust_wait_time <- as.numeric(difftime(gg_new$arrived_at, gg_new$accepted_a , units = "mins"))
+```
+
+```{r , include = FALSE, context="render"}
+##Features Engineering for converting data from order viewpoint to customer viewpoint.
+
+
+## As we don't have the fully data for December we don't consider it in our analyses
+## We devide our data in 2 parts, Train data consists of months from January 2016-October 2016, for which we'll do aggregations, 
+##and the Test data consists of only November, which we'll fix as a time in which we'll examine the customer who are still using gg, 
+##and the customers who have already churned. 
+gg_test <- gg_new[gg_new$month == "November",]
+gg_train <- gg_new[gg_new$month != "November",]
+gg_train <- gg_new[gg_new$month != "December",]
+str(gg_train)
+## Firstly, we seperate the weekend customers in new data, and counted customerIds to understand how many times the specicific customer use
+## gg in non working days.
+gg_weekend_train <- gg_train[gg_train$weekday=="Sunday"|gg_train$weekday=="Saturday",]
+gg_weekend_users_number_train <- gg_weekend_train %>% count(userId)
+gg_weekend_users_number_train<- gg_weekend_users_number_train %>% rename(n_order_weekend=n)
+
+## We seperate the  customers who use gg in whole week in new data, and counted customerIds to understand how many times the specicific customer use
+## gg in every day of the week.
+gg_all_week_users_number_train <- gg_train %>% count(userId)
+gg_all_week_users_number_train <- gg_all_week_users_number_train %>% rename(n_order_all_week = n)
+
+## We summarise fares for each user, to understand how much monney all in all each user spend on gg services whole year
+gg_train_fare <- gg_train %>% group_by(userId) %>% summarise(sumFare= sum(fare))
+## We calculate avgFare, avgWaittime,avgDistance for each user, to understand in average how much time each user waits gg taxies, 
+## in average how far he/she goes with gg, and in average how much he/she pays for the services
+
+gg_train_avg <- gg_train %>% group_by (userId) %>% summarise(avgFare= mean(fare), avgWaitTime = mean(cust_wait_time),
+                                                             avgDistance = mean(distance))
+
+## Here we seperate orders in peek hours, than counted number of peak hour orders by each customer
+gg_peak_hours_train <- gg_train[gg_train$hour==8|gg_train$hour==9|gg_train$hour==10|gg_train$hour==17|gg_train$hour==18|gg_train$hour==19|gg_train$hour==20,]
+gg_peak_hours_user_number_train <- gg_peak_hours_train %>% count(userId)
+gg_peak_hours_user_number_train<- gg_peak_hours_user_number_train %>% rename(n_orders_in_peak_times=n)
+
+## Here we combain 2 datasets by userId, one of which shows the total number of orders in whole week by each userID(it means in this dataset 
+##we have all users)and the other one shows the total number of orders in non working days (in this data we can have don't have userID for 
+##that users who don't have any order in non working days
+##so we put 0's in the column of non working days orders 0's for that users.
+data1 <- left_join(gg_all_week_users_number_train,gg_weekend_users_number_train, by = "userId")
+data1[is.na(data1)] = 0
+
+##Here we combine 2 datsets, puting 0's in the column of the number of orders in peak hours for that users from data1, that do not have 
+##any orders in peak hours
+data2 <-left_join(data1,gg_peak_hours_user_number_train, by = "userId")
+data2[is.na(data2)] = 0
+
+## Finally, we merged all dataset and create our final train datset
+data3 <- merge(gg_train_fare,gg_train_avg,by="userId")
+gg_features_train <-merge(data2,data3,by="userId") 
+
+## Here we create churnInNov column in test dataset which means that customers, who appeare both in this testing dataset and in the training dataset, 
+## are continuing to use gg services and they are not churned, than we are taking from the testing dataset only the userId's and the churned column 
+## and create a new dataset
+gg_test$churnInNov <- 0
+gg_features_test <-as.data.frame(gg_test[,c(3,17)])
+gg_features_test_1 <- gg_features_test %>% distinct(userId) 
+gg_features_test_1$churnInNov <- 0
+
+## Now we combine the training dataset with the newly created dataset with the churned column by userId, and now we have planty of user ID's
+##that are in the training dataset but not in the testing one, so we put 1's for these users, which means that these users churned from gg in November
+##(because of left join it automatically breake in November newly apeared users from testing dataset)
+gg_final <- left_join(gg_features_train,gg_features_test_1, by = "userId")
+gg_final[is.na(gg_final)] = 1
+
+
+```
+
+Clustering analyses to identify permanent and occasional users and their behaviour by segmentation.
+We perform clustering analyses, in which the optimal number of clusters is 6. Here you can see some visualizations.
+```{r , include=FALSE, context="render"}
+
+str(gg_final)
+summary(gg_final)
+
+gg_final$n_order_all_week <- as.numeric(gg_final$n_order_all_week)
+gg_final$sumFare <- as.numeric(gg_final$sumFare)
+gg_final$churnInNov <- as.factor(gg_final$churnInNov)
+gg_final$n_order_non_weekend <- gg_final$n_order_all_week - gg_final$n_order_weekend
+str(gg_final)
+## For clustering analyses we take only numeric variables of our dataset and beacuse we have one majour outlier we drop it from our data
+outlier(gg_final$avgFare)
+gg_final <- gg_final[-106,]
+gg_final_clust <- gg_final[,c(1:8,10)]
+str(gg_final_clust)
+rownames(gg_final_clust)<- gg_final_clust$userId
+gg_final_scale<-as.data.frame(scale(gg_final_clust[,2:9],center = TRUE,scale = TRUE))
+
+## As our data is very large we can do clustering analyses only by kmeans algorithm
+B_T_2 <- c()
+for(i in 1:8){
+  set.seed(1)
+  m2 <- kmeans(gg_final_scale,i)
+  B_T_2[i] <- m2$tot.withinss/m2$totss
+}
+plot(B_T_2) ## As plot shows the optimal number of clusters is 6
+set.seed(2)
+ggCluster <- kmeans(gg_final_scale,6)
+ggCluster$centers
+gg_final$cluster <- as.factor(ggCluster$cluster)
+
+```
+
+```{r}
+options(scipen=999)
+plotOutput("ggpl1")
+plotOutput("ggpl2")
+plotOutput("ggpl3")
+```
+
+
+
+```{r, echo = FALSE, context="server"}
+output$ggpl1 <- renderPlot({
+ggplot(gg_final,aes(x=avgFare,y=avgDistance, col=cluster)) + geom_point(alpha=0.5) + labs(x="Average Fare", y="Average Distance",
+                                                                                            title="Average fare and distance colored by cluster membership")
+})
+output$ggpl2 <- renderPlot({
+ggplot(gg_final,aes(x=sumFare,y=n_order_all_week, col=cluster)) + geom_point(alpha=0.5) + labs(x="Sum of fares of each customer", y="Number of orders in whole week",
+                                                                                               title="Sum fare and and number of orders in whole week colored by cluster membership")
+})
+output$ggpl3 <- renderPlot({
+ggplot(gg_final,aes(x=avgWaitTime,y=avgFare, col=cluster)) + geom_point(alpha=0.5) +  labs(x="Average wait time", y="Average Fare",
+                                                                                                title="Average fare and wait time colored by cluster membership")
+})
+```
+
+
+```{r, include = FALSE}
+options(scipen=999)
+ggplot(gg_final,aes(x=n_order_non_weekend,y=n_order_weekend, col=cluster)) + geom_point(alpha=0.5) + labs(x="Number of orders in non weekend days", y="Number of orders in weekends",
+                                                                                                               title="Number of weekend and non weekend orders colored by cluster membership")
+ggplot(gg_final,aes(x=n_order_non_weekend,y=n_orders_in_peak_times, col=cluster)) + geom_point(alpha=0.5) + labs(x="Number of orders in non weekend days", y="Number of orders in peak hours",
+                                                                                                                      title="Number of orders in non weekend days and in peak hours colored by cluster membership")
+
+ggplot(gg_final,aes(x=avgWaitTime,y=n_order_all_week, col=cluster)) + geom_point(alpha=0.5) +  labs(x="Average wait time", y="Number of orders in whole week",
+                                                                                                         title="Average wait time and number of orders in whole weeek colored by cluster membership")
+
+```
+
+
+
+As wee can see from the plots 
+* 4th classter is gg's permanent customer's cluster, who frequently use GG, but have low average fares but the sum of fares is the largest,which means they use gg for example for going to work everyday, they use gg both in working days and in weekend, and they are probably not waiting for taxi.
+
+* In 1st claster people also use gg frequently, but they mostly use in working days, and mostly in peak hours.
+
+* 3rd cluster is the cluster of customers who use gg occasionally, beacuse the sum of fares and the number of orders for them is the smallest.
+
+* 2nd cluster is the cluster of users which use gg not so frequent but they are traveling not so far and more frequent than users in cluster3.
+
+* 5th cluster is the cluster of users which rarely use gg, but go far and pay high fares
+
+* 6th cluster is the cluster of users who wait the most for the gg and also go far distances, and use gg rarely.
+
+
+
+## Predicting Churnes
+```{r, include = FALSE}
+gg_final$cluster <- as.factor(ggCluster$cluster)
+gg_final$cluster <- plyr :: revalue(gg_final$cluster, c("1"="Second_class_permanent", "2"="Rarely_not_far","3"="Occasional_users","4"="Permanent_users","5"="Rarely_far", "6" = "Waiters"))
+str(gg_final)
+gg_class <- gg_final
+gg_class$churnInNov<- ifelse(gg_class$churnInNov =="1", "Yes","No")
+gg_class$churnInNov <- as.factor(gg_class$churnInNov)
+
+set.seed(123)
+index <- createDataPartition(gg_class$churnInNov,p=0.75,list=F)
+Training_gg<- gg_class[index,]
+Testing_gg <- gg_class[-index,]
+
+```
+***
+
+```{r table}
+tableOutput("table")
+```
+***
+
+For predicting the custumers who will most probably churn and leave GG, we perform 3 classification models Logistic regression, Decision Tree and Naive Bayes.The highest area under the curve has the logit model, in terms of accuracy Logit model is also the winner, but in case of specificity the winner is Decision tree and the highest sencitifity has Naive Bayes, so all in all for accurate predictions we'll choose the logistic regression model, but if our main goal is to predict beforehand the users who will most probably leave gg, we will use decision tree, and if want exactly predict only the customers who will stay with use we'll use Naive Bayes Algorithm.
+
+
+```{r, include = FALSE}
+## Logistic regression ##
+options(scipen=999)
+model1 <- glm(churnInNov~n_order_non_weekend+n_order_weekend+n_orders_in_peak_times+avgWaitTime+avgFare + cluster, 
+              data = Training_gg,family="binomial")
+summary(model1)
+exp(coef(model1))
+probs <- predict(model1, newdata=Testing_gg, type = "response")
+
+pr_class <- factor(ifelse(probs>0.57, "Yes","No"))
+conf_logit <- caret :: confusionMatrix(data=pr_class, reference=Testing_gg$churnInNov, positive="Yes")
+
+## finding the best cutoff value ##
+
+pred_object <- prediction(probs,Testing_gg$churnInNov)
+perf <- performance(pred_object,"tpr","fpr")
+plot(perf, colorize=T)
+performance(pred_object,"auc")@y.values
+auc_logit <- c(0.7526163)
+
+prpred <- seq(0.3, 0.8, 0.03)
+
+a <-data.frame()
+for(i in 1:length(prpred)){
+  pr_class <- factor(ifelse(probs>prpred[i],"Yes","No"))
+  b <- confusionMatrix(data=pr_class,reference = Testing_gg$churnInNov,positive="Yes")
+  a[i,"Cutoff"] <- prpred[i]
+  a[i,"Accuracy"] <- b$overall[1]
+}
+a
+logit_sens<-conf_logit$byClass[1]
+logit_spec<-conf_logit$byClass[2]
+logit_acuracy<-conf_logit$overall[1]
+## The best cutoof value in which we have maximal AUC is 0.57
+
+
+```
+***
+
+## Resulting Logistic Model
+```{r}
+verbatimTextOutput("sum1")
+verbatimTextOutput("sum2")
+```
+***
+
+
+```{r, echo = FALSE, context="server"}
+output$sum1 <- renderText({
+
+options(scipen=999)
+
+exp(coef(model1))
+
+})
+output$sum2 <- renderPrint({summary(model1)})
+
+```
+
+The output of logistic regression shows that all variables except number of orders in peak times are significant, so we can conclude that:
+
+* If number of orders for the user on working days increases by 1, the odds of churning decreases by 4 %. 
+
+* If number of orders for the user on  weekends increase by 1, the odds of churning decreases by 5 %. 
+
+* If number of orders for the user on peak hours increase by 1, the odds of churning increases by 0.02 %, but this coefficient is not significant.
+
+* If average wait time for the user  increase by 1, the odds of churning increases by 4 %. 
+
+* If average fare for the user increases by 1, the odds of churning increases by 0.02 %.
+
+* The most permanent users has 578% more odds to churn compared to second class permanent users.
+
+* The users who use gg rarely but go far has 99.46 % less odds to churn compared to second class permanent users.
+
+* The users who use gg rarely but go not so far has 97.2% less odds to churn compared to second class permanent users.
+
+* The occasional users  has 98% less odds to churn compared to second class permanent users.
+
+* The waiters  has 98% less odds to churn compared to second class permanent users.
+
+```{r, include=FALSE, context = "render"}
+## Desicion tree ##
+str(gg_final)
+model_tree <- rpart(churnInNov~n_order_non_weekend+n_order_weekend+n_orders_in_peak_times+avgWaitTime+avgFare+ cluster, 
+                     data = Training_gg)
+pred_class <- predict(model_tree,Testing_gg, type="class")
+conf_tree <-caret:: confusionMatrix(pred_class,Testing_gg$churnInNov, positive = "Yes")
+pred_prob <- predict(model_tree,Testing_gg)
+P_Test <- prediction(pred_prob[,2],Testing_gg$churnInNov)
+perf2<- performance(P_Test,"tpr","fpr")
+performance(P_Test,"auc")@y.values
+auc_tree <- c( 0.6891539)
+##finding the best inbucket value
+minb <- seq(20,1000,50)
+b <- data.frame()
+for ( i in 1:length(minb)) {
+  model3 <- rpart(churnInNov~n_order_non_weekend+n_order_weekend+n_orders_in_peak_times+avgWaitTime+avgFare + cluster, 
+                  data = Training_gg, control = rpart.control(minbucket = minb[i]))
+  pred <- predict(model3,newdata = Testing_gg, type = "class")
+  k <- caret:: confusionMatrix(pred, Testing_gg$churnInNov, positive = "Yes")
+  b[i,1] <- minb[i]
+  b[i,2] <- k$byClass[1]
+}
+names(b) <- c("Buckets","Sensitivity")
+b
+tree_sens<-conf_tree$byClass[1]
+tree_spec<-conf_tree$byClass[2]
+tree_acuracy<-conf_tree$overall[1]
+
+## for all values of minbucket the sensitivity remains the same.
+```
+
+
+```{r,include = FALSE, context = "render"}
+##Naive Bayes##
+model_naive <- naiveBayes(churnInNov~n_order_non_weekend+n_order_weekend+n_orders_in_peak_times+avgWaitTime+avgFare + cluster,
+                          data = Training_gg, laplace = 1)
+pred_test <- predict(model_naive, newdata = Testing_gg)
+conf_naive <- caret::confusionMatrix(pred_test, Testing_gg$churnInNov, positive = "Yes")
+pred_test_prob <- predict(model_naive, newdata= Testing_gg, type="raw")
+p_test <- prediction(pred_test_prob[,2], Testing_gg$churnInNov)
+perf_naive <- performance(p_test, "tpr","fpr")
+performance(p_test,"auc")@y.values
+auc_naive <- c(0.7262362)
+
+naive_sens<-conf_naive$byClass[1]
+naive_spec<-conf_naive$byClass[2]
+naive_acuracy<-conf_naive$overall[1]
+```
+
+```{r, include = FALSE, context = "render"}
+## comparing models
+model_names <- c("Logit","NaiveBayes","DecisionTree")
+accuracy <- c(logit_acuracy,naive_acuracy,tree_acuracy)
+sensitivity <- c(logit_sens,naive_sens,tree_sens)
+specificity <- c(logit_spec,naive_spec,tree_spec)
+auc_models <- c(auc_logit,auc_naive,auc_tree)
+comp <-data.frame(model_names,accuracy,auc_models,sensitivity,specificity)
+str(comp)
+
+```
+
+```{r, context="server"}
+output$table <- renderTable({
+  comp
+})
+```
+

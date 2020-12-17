@@ -1,0 +1,12 @@
+"0","data %>% group_by(Platform) %>% summarise(Total=sum(Global_Sales)) %>%
+  arrange(desc(Total)) %>% head(n=10) %>%
+  ggplot()+geom_bar(mapping = aes(x=reorder(Platform, -Total), y=Total), stat = ""identity"", fill = ""azure4"")+
+  theme_bw()+
+  theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank())+
+  labs(title = ""Top 10 Platforms by Global Sales"", x=""Platform"", y=""Total Sales"")
+"
+"2","`summarise()` ungrouping output (override with `.groups` argument)
+"

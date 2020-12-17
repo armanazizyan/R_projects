@@ -1,0 +1,5 @@
+"0","ggplot(dataout, mapping = aes(x=price, y=..density..))+"
+"0","  geom_histogram(bins = 50, fill =""azure2"", color = ""black"")+"
+"0","  theme_bw()+"
+"0","  labs(title = ""Price Distrsibution"", x=""Price"", y=""Number of Listings"")+"
+"0","  geom_density(data = dataout, mapping = aes(x=price))"
